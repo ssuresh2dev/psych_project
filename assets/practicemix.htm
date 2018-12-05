@@ -1,0 +1,457 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" >
+<head>
+<title>Media Lab Custom Item</title>
+<style TYPE="text/css">
+	body
+	{
+		font-family: Arial;
+		font-size:12px;
+	}
+	
+		/*//////////////////////////////////////////////*/
+		/*// Configurable placement variables           */
+		/*// Change top/left values for new placement   */
+		/*//////////////////////////////////////////////*/
+	
+	/*Page Title*/
+	#Title
+	{
+		top:20px;
+		left:20px;
+		font-weight:bold;
+		font-size:18px;
+	}
+	
+	/*Embedded media*/
+	#Media
+	{
+		left:200px;
+		top:200px;
+	}
+	
+	/*Coordinates/Time display*/
+	#CoordinatesTime
+	{
+		left:760px;
+		top:50px;
+	}
+	
+	/*Area for mouse tracking*/
+	#TestArea
+	{
+		left:760px;
+		top:80px;
+	}
+	
+	/*Stop tracking button*/
+	#CompleteButton
+	{
+		left:760px;
+		top:450px;
+	}
+	
+	div
+	{
+		position:absolute;
+	}
+	
+	input.button 
+	{
+		padding: 0 3px;
+		width: 0;
+		overflow:visible;
+	}
+	
+	input.button[class] 
+	{ 
+		width: auto;
+	}
+	
+	#TestArea td
+	{
+		padding: 3px 3px 0 0;
+		text-align:center;
+	}
+	
+	#trackTable td
+	{
+		padding: 0;
+		cursor:url('images/greendot.cur');
+	}
+	
+</style>
+<script type='text/javascript' src='src/StringBuffer.js'></script>
+<script type='text/javascript' src='src/prototype-1.6.0.2.js'></script>
+<script type='text/javascript'>
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//START CONFIGURABLE VARIABLES
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+var title = 'Product Evaluation Grid';
+var xAxisLabel = 'How much do you feel like taking or consuming<br/> the product on the tray right now?';
+var yAxisLabel = 'How much do you feel like removing or avoiding <br/>the product on the tray rght now?';
+var buttonText = 'Stop Experiment';
+var useLabels = true;
+
+//when mouse is not over the grid, these are the values that will be captured at each interval.
+//use an uncommon value to exclude from data easily
+var xValueWhenMouseOffGrid = 999;
+var yValueWhenMouseOffGrid = 999;
+
+//set this to be the name of the variable that holds the coordinate values, this is matched with the value set up in mediaLab
+var coorValueName = 'CoorVal5';
+	
+//populate this variable to have the experiment run for a fixed length of time (in milliseconds), experiment will submit and data will be collected after designated milliseconds elapsed.
+//set this to 0 to show the stop experiment button, and then the experiment length is controlled by subject with a click of 'Stop Experiment' button.
+var timerLimit = 30000;
+
+//This is the interval (in milliseconds) for each coordinate capture
+var increment = 100;
+
+// so, the above settings would run an experiment for one second, taking 10 coordinate snapshots (each 10th of a second).
+
+//set this to true to add ms timestamp in the data like:  0*0~100|0*0~200|0*0~300
+//set this to false to not have ms the timestamp in data, like: 0*0|0*0|0*0
+var addTimeStampToData = false;
+
+//Acceptable extensions: swf, avi, mpg, mov, gif, jpg, bmp, mp3
+//Media must be in /media folder
+//var mediaFileName = 'uofc.swf';
+//var mediaWidthInPixels = 250;
+//var mediaHeightInPixels = 200;
+			
+//var mediaFileName = 'gleacher.gif';
+//var mediaWidthInPixels = 233;
+//var mediaHeightInPixels = 214;
+
+//var mediaFileName = 'black.jpg';
+//var mediaWidthInPixels = 480;
+//var mediaHeightInPixels = 360;
+
+var mediaFileName = 'dot.bmp';
+var mediaWidthInPixels = 25;
+var mediaHeightInPixels = 25;
+
+//var mediaFileName = 'serious84.rm';
+//var mediaWidthInPixels = 200;
+//var mediaHeightInPixels = 200;
+
+//var mediaFileName = 'pythag.mpg';
+//var mediaWidthInPixels = 300;
+//var mediaHeightInPixels = 250;
+
+//var mediaFileName = 'neg_pos2.wmv';
+//var mediaWidthInPixels = 640;
+//var mediaHeightInPixels = 480;
+
+//var mediaFileName = 'mtrcyclecrash.mov';
+//var mediaWidthInPixels = 300;
+//var mediaHeightInPixels = 250;
+
+//var mediaFileName = 'AS_negpos.avi';
+//var mediaWidthInPixels = 500;
+//var mediaHeightInPixels = 500;
+
+//var mediaFileName = 'obama.mp3';
+//var mediaWidthInPixels = 0;
+//var mediaHeightInPixels = 0;
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//END  CONFIGURABLE VARIABLES
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var dateObj;
+var buf = new StringBuffer();
+var append = false;
+var keepCalling = true;
+var Coordinate_X_InImage = 0;
+var Coordinate_Y_InImage = 0;
+var timeElapsed = 0;
+var timeStamp = 0;
+var mediaFileName = "media/" + mediaFileName;
+var mediaType = GetMediaFileType(mediaFileName);
+var strEmbed = GetMediaEmbedCode(mediaFileName);
+var CoordinatesTime;
+
+var imageToMonitor;
+var imageToMonitorOffsetTop = 0;
+var imageToMonitorOffsetLeft = 0;
+
+window.onload = Init;
+function Init()
+{
+	document.getElementById('CoorValue').name = coorValueName;
+	document.getElementById('Title').innerHTML = title;
+	document.getElementById('Media').innerHTML = strEmbed;
+    document.getElementById('xAxisLabel').innerHTML = xAxisLabel;
+    document.getElementById('yAxisLabel').innerHTML = yAxisLabel;
+    document.getElementById('Submit').value = buttonText;
+	CoordinatesTime = document.getElementById('CoordinatesTime');
+	
+	if (useLabels)
+	{
+		document.getElementById('imgTrackTop').src = 'images/trackTopLabeled.gif';
+		document.getElementById('imgTrackLeft').src = 'images/trackLeftLabeled.gif';
+		document.getElementById('imgTrackBottom').src = 'images/trackBottomLabeled.gif';
+	}
+	
+	imageToMonitor = document.getElementById('idImageToMonitor');
+	imageToMonitorOffsetTop = getY(imageToMonitor);
+	imageToMonitorOffsetLeft = getX(imageToMonitor);
+	
+	TieGetCoordinatesToImageToMonitor();
+
+	//hide the submit button if a time limit for the experiment is set.
+	if(timerLimit != 0)
+		document.getElementById('Submit').style.display = 'none';
+		
+	document.oncontextmenu = new Function("return false");
+	
+	StartTimer();
+}
+
+function IncrementTimer() 
+{
+	var cdateObj = new Date();
+	timeElapsed = (cdateObj.getTime() - dateObj.getTime());
+	DisplayElapsedTime();
+	if((timeElapsed - timeStamp) >= (increment))
+	{
+		timeStamp = timeStamp + (increment);
+		AddCoordinateValue();
+	}
+	if(keepCalling == true)
+		setTimeout("IncrementTimer()", 1);
+}
+
+function StartTimer() 
+{
+	dateObj = new Date();
+	IncrementTimer();
+}
+
+function AddCoordinateValue() 
+{
+	$('idImageToMonitor').fire('customItem:GetCoordinates');
+	if(addTimeStampToData)
+		StoreInfo(Coordinate_X_InImage + "*" + Coordinate_Y_InImage + "~" + timeStamp);
+	else
+		StoreInfo(Coordinate_X_InImage + "*" + Coordinate_Y_InImage);
+}
+
+function DisplayElapsedTime()
+{
+	CoordinatesTime.innerHTML = "<strong>X/Y Coordinates:</strong> " + Coordinate_X_InImage + "," + Coordinate_Y_InImage + "<br/><strong>Time:</strong> " + timeElapsed + "ms";
+	//CoordinatesTime.innerHTML = "<strong>Time:</strong> " + timeElapsed + "ms";
+}
+
+function StoreInfo(newinfo){
+    
+	if(append)
+        buf.append("|");
+	
+	buf.append(newinfo);
+	append = true;
+	
+	//if there is a timerLimitSet, post the form when we get there
+	if(timeStamp >= timerLimit && timerLimit != 0)
+	{
+		keepCalling = false;
+		PopulateCoorValue();
+		setTimeout("SubmitForm()", 500);
+	}
+}
+
+function TieGetCoordinatesToImageToMonitor()
+{
+	$('idImageToMonitor').observe('customItem:GetCoordinates', function(evt){
+	
+	Coordinate_X_InImage = 0;
+    Coordinate_Y_InImage = 0;
+    
+	var x = event.offsetX;
+    var y = event.offsetY;
+	
+	Coordinate_X_InImage = x - imageToMonitorOffsetLeft;
+	Coordinate_Y_InImage = y - imageToMonitorOffsetTop;
+	
+	if(Coordinate_X_InImage < 0 ||  Coordinate_X_InImage > 300 || Coordinate_Y_InImage < 0 ||  Coordinate_Y_InImage > 300)
+	{
+		Coordinate_X_InImage = xValueWhenMouseOffGrid;
+		Coordinate_Y_InImage = yValueWhenMouseOffGrid;
+	}
+	
+	});
+}
+
+function PopulateCoorValue()
+{
+    keepCalling = false;
+	var cVal = buf;
+	document.getElementById('CoorValueTemp').value = cVal;
+	document.getElementById('CoorValue').value = document.getElementById('CoorValueTemp').value;
+	setTimeout("SubmitForm()", 500);
+}
+
+function SubmitForm()
+{
+	var theForm = document.getElementById('form1');
+	theForm.submit();
+}
+
+function GetMediaFileType(mediaFileName)
+{
+	var arrFileName = mediaFileName.split(".");
+	return arrFileName[1];
+}
+
+function GetMediaEmbedCode(mediaFileName)
+{
+	switch (mediaType)
+	{
+	case 'swf':
+		strEmbed =  "<object id='flashMovie' classid='clsid:D27CDB6E-AE6D-11cf-96B8-444553540000' width='" + mediaWidthInPixels + "' height='" + mediaHeightInPixels + "'>";
+		strEmbed += "<param name='movie' value='" + mediaFileName + "' />";
+		strEmbed += "<param name='bgcolor' value='#fff' />";
+		strEmbed += "<param name='quality' value='high' />";
+		strEmbed += "<param name='name' value='flashMovie' />";
+		strEmbed += "<param name='id' value='flashMovie' />";
+		strEmbed += "<param name='AllowScriptAccess' value='always' />";
+		strEmbed += "<param name='wmode' value='transparent' />";
+		strEmbed += "<param name='menu' value='false' />";
+		strEmbed += "<param name='loop' value='false' />";
+		strEmbed += "</object>";
+		return strEmbed;
+		break;
+	case 'rm':
+		strEmbed =  "<OBJECT id='rvocx' classid='clsid:CFCDAA03-8BE4-11cf-B84B-0020AFBBCCFA' width='" + mediaWidthInPixels + "' height='" + mediaHeightInPixels + "'>";
+		strEmbed += "<param name='src' value='" + mediaFileName + "'>";
+		strEmbed += "<param name='autostart' value='true'>";
+		strEmbed += "<param name='controls' value='imagewindow'>";
+		strEmbed += "<param name='console' value='audio'>";
+		strEmbed += "<param name='loop' value='false'>";
+		strEmbed += "</OBJECT>";
+		return strEmbed;
+		break;
+	case 'avi':
+		strEmbed =  "<object id='MediaPlayer' CLASSID='CLSID:22d6f312-b0f6-11d0-94ab-0080c74c7e95' codebase='http://activex.microsoft.com/activex/controls/mplayer/en/nsmp2inf.cab#Version=5,1,52,701' type='application/x-oleobject' width='" + mediaWidthInPixels + "' height='" + mediaHeightInPixels + "'>";
+		strEmbed += "<param name='fileName' value='" + mediaFileName + "'>";
+		strEmbed += "<param name='autoStart' value='true'>";
+		strEmbed += "<param name='showControls' value='false'>";
+		strEmbed += "</object>";
+		return strEmbed;
+		break;            
+	case 'wmv':
+		strEmbed =  "<object id='MediaPlayer' CLASSID='CLSID:22d6f312-b0f6-11d0-94ab-0080c74c7e95' codebase='http://activex.microsoft.com/activex/controls/mplayer/en/nsmp2inf.cab#Version=5,1,52,701' type='application/x-oleobject' width='" + mediaWidthInPixels + "' height='" + mediaHeightInPixels + "'>";
+		strEmbed += "<param name='fileName' value='" + mediaFileName + "'>";
+		strEmbed += "<param name='autoStart' value='true'>";
+		strEmbed += "<param name='showControls' value='false'>";
+		strEmbed += "</object>";
+		return strEmbed;
+		break;
+	case 'mpg':
+		strEmbed =  "<object id='MediaPlayer' CLASSID='CLSID:22d6f312-b0f6-11d0-94ab-0080c74c7e95' codebase='http://activex.microsoft.com/activex/controls/mplayer/en/nsmp2inf.cab#Version=5,1,52,701' type='application/x-oleobject' width='" + mediaWidthInPixels + "' height='" + mediaHeightInPixels + "'>";
+		strEmbed += "<param name='fileName' value='" + mediaFileName + "'>";
+		strEmbed += "<param name='autoStart' value='true'>";
+		strEmbed += "<param name='showControls' value='false'>";
+		strEmbed += "</object>";
+		return strEmbed;
+		break;
+	case 'mov':
+		strEmbed =  "<OBJECT id='QuickTimePlayer' classid='clsid:02BF25D5-8C17-4B23-BC80-D3488ABDDC6B' width='" + mediaWidthInPixels + "' height='" + mediaHeightInPixels + "' codebase='http://www.apple.com/qtactivex/qtplugin.cab'>";
+		strEmbed += "<param name='src' value='" + mediaFileName + "'>";
+		strEmbed += "<param name='autoplay' value='true'>";
+		strEmbed += "<param name='controller' value='false'>";
+		strEmbed += "<param name='loop' value='false'>";
+		strEmbed += "</OBJECT>";
+		return strEmbed;
+		break;	
+	case 'mp3':
+		strEmbed =  "<object style='display:none' id='MediaPlayer' CLASSID='CLSID:22d6f312-b0f6-11d0-94ab-0080c74c7e95' codebase='http://activex.microsoft.com/activex/controls/mplayer/en/nsmp2inf.cab#Version=5,1,52,701' type='application/x-oleobject' width='" + mediaWidthInPixels + "' height='" + mediaHeightInPixels + "'>";
+		strEmbed += "<param name='fileName' value='" + mediaFileName + "'>";
+		strEmbed += "<param name='autoStart' value='true'>";
+		strEmbed += "<param name='showControls' value='false'>";
+		strEmbed += "</object>";
+		strEmbed += "<img src='images/speaker.gif' style='vertical-align:middle'/> Playing Audio";
+		return strEmbed;
+		break;		
+	case 'gif':
+		strEmbed = "<img src='" + mediaFileName + "' width='" + mediaWidthInPixels + "' height='" + mediaHeightInPixels + "' />";
+		return strEmbed;
+		break;
+	case 'jpg':
+		strEmbed = "<img src='" + mediaFileName + "' width='" + mediaWidthInPixels + "' height='" + mediaHeightInPixels + "' />";
+		return strEmbed;
+		break;
+	case 'bmp':
+		strEmbed = "<img src='" + mediaFileName + "' width='" + mediaWidthInPixels + "' height='" + mediaHeightInPixels + "' />";
+		return strEmbed;
+		break;
+	}
+}
+
+function getY(oElement)
+{
+	var iReturnValue = 0;
+	while( oElement != null ) 
+	{
+		iReturnValue += oElement.offsetTop;
+		oElement = oElement.offsetParent;
+	}
+	return iReturnValue;
+}
+
+function getX(oElement)
+{
+	var iReturnValue = 0;
+	while( oElement != null ) 
+	{
+		iReturnValue += oElement.offsetLeft;
+		oElement = oElement.offsetParent;
+	}
+	return iReturnValue;
+}
+
+</script>
+</head>
+<body>
+<form name='form1' method='post'>
+<div id='Title'></div>
+<div id='Media'></div>
+<input type='hidden' id="CoorValue" value='' />
+<div id='CoordinatesTime'></div>
+<div id='TestArea'>
+    <table cellpadding='0' cellspacing='0'>
+        <tr>
+            <td id='yAxisLabel'>&nbsp;</td>
+            <td>
+                <table id='trackTable' border='0' cellpadding='0' cellspacing='0'>
+                    <tr>
+                        <td colspan='3'><img id = 'imgTrackTop' src='images/trackTop.gif' /></td>
+                    </tr>
+                    <tr>
+                        <td><img id = 'imgTrackLeft' src='images/trackLeft.gif' /></td>
+                        <td><img name='ImageToMonitor' id='idImageToMonitor' src='images/trackCenter.gif' onmousedown="return;" onclick='return false;' /></td>
+                        <td><img src='images/trackRight.gif' /></td>
+                    </tr>
+                    <tr>
+                        <td colspan='3'><img id = 'imgTrackBottom' src='images/trackBottom.gif' /></td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>&nbsp;</td>
+            <td id='xAxisLabel'>&nbsp;</td>
+        </tr>
+    </table>
+</div>
+<input type='hidden' name="CoorValueTemp" id="CoorValueTemp" value='' />
+<div id='CompleteButton'>
+<!--<input type='button' name='button' value='Start' onclick='StartTimer();' />-->
+<input type='button' name='Submit' value='Submit' onclick='PopulateCoorValue();' id='Submit' class='button' />
+</div>
+</form>
+</body>
+</html>

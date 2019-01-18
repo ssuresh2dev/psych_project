@@ -24,33 +24,47 @@ class Timer(Thread):
             self.function()
 
 class Application(Frame):
-    def __init__(self, sample_freq, image_freq, image_directory, master=None):
+    def __init__(self, master=None):
         Frame.__init__(self, master)
-        master.geometry("1000x500")
 
-        self.sample_freq = sample_freq
-        self.image_freq = image_freq
-        self.image_directory = image_directory
-        fm = Frame(master)
+        row1 = Frame(master)
+        self.im_freq_label = Label(row1, text="Image Replacement Frequency").pack(padx=10, pady=10, side=LEFT)
+        self.im_freq_entry = Entry(row1)
+        self.im_freq_entry.pack(side=RIGHT)
 
-        # Set up UI elements
-        self.startbtn = Button(fm, text="Start", command=self.start_sampling)
-        self.startbtn.grid(row=0, column=0)
-        self.stopbtn = Button(fm, text="Stop", command=self.stop_sampling)
-        self.stopbtn.grid(row=0, column=1)
+        row2 = Frame(master)
+        self.s_freq_label = Label(row2, text="Mouse Sample Frequency").pack(padx=10, pady=10, side=LEFT)
+        self.s_freq_entry = Entry(row2)
+        self.s_freq_entry.pack(side=RIGHT)
 
-        image = Image.open("white.jpg")
-        photo = ImageTk.PhotoImage(image)
-        self.pic = Label(fm, image=photo)
-        self.pic.image = photo
-        self.pic.grid(row=1, column=0)
+        row3 = Frame(master)
+        self.im_dir_label = Label(row3, text="Image Directory Path").pack(padx=10, pady=10, side=LEFT)
+        self.im_dir_entry = Entry(row3)
+        self.im_dir_entry.pack(side=RIGHT)
 
-        self.f = Figure(figsize=(3,3), dpi=130)
-        a = self.f.add_subplot(111)
-        self.canvas = FigureCanvasTkAgg(self.f, fm)
-        self.canvas.get_tk_widget().grid(row=1, column=1)
+        row4 = Frame(master)
+        self.startbtn = Button(row4, text="Start", command=self.start_sampling)
+        self.startbtn.pack(padx=10, pady=10, side=LEFT)
+        self.stopbtn = Button(row4, text="Stop", command=self.stop_sampling)
+        self.stopbtn.pack(padx=10, pady=10, side=RIGHT)
+
+        row5 = Frame(master)
+        photo = ImageTk.PhotoImage(Image.open("white.jpg").resize((200, 200)))
+        self.stimulus = Label(row5, image=photo)
+        self.stimulus.image = photo
+        self.stimulus.pack(padx=10, pady=10, side=LEFT)
+
+        self.graph = Figure(figsize=(3,3), dpi=130)
+        a = self.graph.add_subplot(111)
+        self.canvas = FigureCanvasTkAgg(self.graph, row5)
+        self.canvas.get_tk_widget().pack(side=RIGHT)
         self.canvas.mpl_connect('motion_notify_event', self.on_mouse_hover)
-        fm.pack()
+
+        row1.pack()
+        row2.pack()
+        row3.pack()
+        row4.pack()
+        row5.pack()
 
         self.last_x = None
         self.last_y = None
@@ -61,15 +75,17 @@ class Application(Frame):
                 w.writerow(['X Position', 'Y Position'])
 
         self.stopFlag = Event()
-        self.thread = Timer(self.stopFlag, sample_freq, self.sample_mouse_position)
+        self.thread = None
 
         self.imageFlag = Event()
-        self.imageThread = Timer(self.imageFlag, image_freq, self.update_image)
+        self.imageThread = None
 
         self.current_image = None
 
     def start_sampling(self):
+        self.thread = Timer(self.stopFlag, int(self.s_freq_entry.get()), self.sample_mouse_position)
         self.thread.start()
+        self.imageThread = Timer(self.imageFlag, int(self.im_freq_entry.get()), self.update_image)
         self.imageThread.start()
 
     def stop_sampling(self):
@@ -81,12 +97,11 @@ class Application(Frame):
         self.last_y = event.ydata
 
     def update_image(self):
-        images = listdir(self.image_directory)
+        images = listdir(self.im_dir_entry.get())
         ind = random.randint(0, len(images) - 1)
-        image = Image.open(self.image_directory + "/" + images[ind])
-        photo = ImageTk.PhotoImage(image)
-        self.pic.configure(image=photo)
-        self.pic.image = photo
+        photo = ImageTk.PhotoImage(Image.open(self.im_dir_entry.get() + "/" + images[ind]).resize((200, 200)))
+        self.stimulus.configure(image=photo)
+        self.stimulus.image = photo
         self.current_image = images[ind]
         self.update()
 
@@ -101,16 +116,8 @@ class Application(Frame):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--scale')
-    parser.add_argument('-v', '--verbose')
-    parser.add_argument('-sf', '--sample_freq', required=True)
-    parser.add_argument('-if', '--image_freq', required=True)
-    parser.add_argument('-d', '--image_directory', required=True)
-    args = parser.parse_args()
-
     root = Tk()
-    app = Application(float(args.sample_freq), float(args.image_freq), args.image_directory, master=root)
+    app = Application(master=root)
     app.update()
     app.mainloop()
     try:
